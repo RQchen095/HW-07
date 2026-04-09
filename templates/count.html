@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>次方與根號計算</title>
+</head>
+<body>
+
+    <h2>次方與根號計算</h2>
+
+    x: <input type="number" id="x"><br><br>
+
+    運算：
+    <select id="opt">
+        <option value="pow">^ (次方)</option>
+        <option value="sqrt">√ (根號)</option>
+    </select><br><br>
+
+    y: <input type="number" id="y"><br><br>
+
+    <button onclick="calculate()">計算</button>
+
+    <p id="result"></p>
+
+    <script>
+        function calculate() {
+            // 抓取 HTML 裡面的數值
+            var x = parseFloat(document.getElementById('x').value);
+            var opt = document.getElementById('opt').value;
+            var y = parseFloat(document.getElementById('y').value);
+            var display = document.getElementById('result');
+
+            // 檢查是否輸入數字
+            if (isNaN(x) || isNaN(y)) {
+                display.innerText = "請輸入數字";
+                return;
+            }
+
+            // 判斷運算邏輯
+            var ans;
+            if (opt == "pow") {
+                ans = Math.pow(x, y); // x^y
+            } else {
+                ans = Math.pow(x, 1 / y); // x 的 y 次方根
+            }
+
+            // 把結果寫回頁面
+            display.innerText = ans;
+        }
+    </script>
+    <a href=/>返回首頁</a>
+
+</body>
+</html>
