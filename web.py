@@ -77,7 +77,7 @@ def read():
     collection_ref = db.collection("py")    
     docs = collection_ref.get()    
     for doc in docs:         
-        Result += "文件內容：{}".format(doc.to_dict()) + "<br>"    
+        Result += str(doc.to_dict()) + "<br>"    
     return Result
 
 if __name__ == "__main__":
