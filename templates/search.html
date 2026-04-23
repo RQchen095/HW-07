@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>找老師</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        .search-area { margin-bottom: 20px; }
+        input[type="text"] { width: 180px; padding: 3px; }
+        hr { border: 0; border-top: 1px solid #ccc; margin: 15px 0; }
+        .result-item { margin-bottom: 10px; border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
+        .no-result { color: #666; }
+        a { color: blue; text-decoration: none; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <h2>老師查詢</h2>
+
+    <div class="search-area">
+        <form method="POST">
+            請輸入老師姓名關鍵字：
+            <input type="text" name="keyword" value="{{ keyword }}">
+            <button type="submit">查詢</button>
+        </form>
+    </div>
+
+    <hr>
+
+    <div id="results">
+        {% if keyword %}
+            <h3>查詢結果 (關鍵字: {{ keyword }}):</h3>
+            
+            {% if results %}
+                {% for teacher in results %}
+                    <div class="result-item">
+                        <span style="color: blue; font-weight: bold;">{{ teacher.name }}</span> 
+                        老師的研究室在 <strong>{{ teacher.lab }}</strong>
+                        {% if teacher.mail %} ({{ teacher.mail }}){% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-result">找不到符合「{{ keyword }}」的老師。</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <br>
+    <a href="/">返回首頁</a>
+
+</body>
+</html>

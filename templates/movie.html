@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>找電影</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        .search-area { margin-bottom: 20px; }
+        input[type="text"] { width: 180px; padding: 3px; }
+        hr { border: 0; border-top: 1px solid #ccc; margin: 15px 0; }
+        .result-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #ddd;
+            padding-bottom: 10px;
+        }
+        .result-item img { width: 80px; height: auto; border-radius: 4px; }
+        .movie-info { display: flex; flex-direction: column; gap: 4px; }
+        .no-result { color: #666; }
+        a { color: blue; text-decoration: none; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <h2>電影查詢</h2>
+
+    <div class="search-area">
+        <form method="POST">
+            請輸入電影名稱關鍵字：
+            <input type="text" name="keyword" value="{{ keyword }}">
+            <button type="submit">查詢</button>
+        </form>
+    </div>
+
+    <hr>
+
+    <div id="results">
+        {% if keyword %}
+            <h3>查詢結果 (關鍵字: {{ keyword }}):</h3>
+
+            {% if results %}
+                {% for movie in results %}
+                    <div class="result-item">
+                        <img src="{{ movie.img }}" alt="{{ movie.name }}">
+                        <div class="movie-info">
+                            <span style="color: blue; font-weight: bold;">{{ movie.name }}</span>
+                            <a href="{{ movie.url }}" target="_blank">查看詳情 →</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-result">找不到符合「{{ keyword }}」的電影。</p>
+            {% endif %}
+
+        {% else %}
+            <p class="no-result">請輸入關鍵字以查詢電影。</p>
+        {% endif %}
+    </div>
+
+    <br>
+    <a href="/">返回首頁</a>
+
+</body>
+</html>

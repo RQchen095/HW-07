@@ -130,19 +130,36 @@ def teacher():
 
     return result + "<br><a href=/>返回首頁</a>"
 
-@app.route("/movie")
+@app.route("/movie", methods=["GET", "POST"])
 def movie():
+    keyword = ""
+    results = []
+
     url = "https://www.atmovies.com.tw/movie/next/"
     Data = requests.get(url)
-    R = ""
     sp = BeautifulSoup(Data.text, "html.parser")
-    result=sp.select(".filmListAllX li")
-    info = ""
-    for item in result:
-        R+=item.find("img").get("alt")+"<br>"
-        R+="https://www.atmovies.com.tw/movie/next/"+item.find("a").get("href")+"<br>"
-        R+="https://www.atmovies.com.tw/movie/next/"+item.find("img").get("src")+"<br><br>"
-    return R
+    items = sp.select(".filmListAllX li")
+
+    # 先把所有電影整理好
+    all_movies = []
+    for item in items:
+        name = item.find("img").get("alt", "")
+        href = item.find("a").get("href", "")
+        src = item.find("img").get("src", "")
+        all_movies.append({
+            "name": name,
+            "url": "https://www.atmovies.com.tw" + href,
+            "img": src  # img src 通常是完整路徑，視情況調整
+        })
+
+    if request.method == "POST":
+        keyword = request.form.get("keyword", "").strip()
+        if keyword:
+            results = [m for m in all_movies if keyword in m["name"]]
+        else:
+            results = all_movies  # 沒輸入關鍵字就顯示全部
+
+    return render_template("movie.html", keyword=keyword, results=results)
 
 
 if __name__ == "__main__":
