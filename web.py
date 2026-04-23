@@ -1,9 +1,14 @@
 from flask import Flask, render_template, request
 from datetime import datetime
 import os
+import math
+
 import json
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+import requests
+from bs4 import BeautifulSoup
 
 # 判斷是在 Vercel 還是本地
 if os.path.exists('serviceAccountKey.json'):
@@ -16,10 +21,7 @@ else:
     cred = credentials.Certificate(cred_dict)
 
 firebase_admin.initialize_app(cred)
-
-app = Flask(__name__)
-
-
+db = firestore.client()
 app = Flask(__name__)
 
 @app.route("/")
@@ -31,8 +33,10 @@ def index():
     link+="<a href=/welcome?u=ycc&d=靜宜資管&c=資訊管理導論>Get傳值</a><br><hr>"
     link+="<a href=/account>POST傳值</a><br><hr>"
     link+="<a href=/count>次方與根號計算</a><br><hr>"    
-    link += "<br><a href=/read>讀取Firestore資料</a><br>"
-
+    link+="<br><a href=/read>讀取Firestore資料</a><br><hr>"
+    link+="<a href=/search>找老師</a><br><hr>"    
+    link+="<br><a href=/teacher>爬老師課程</a><br><hr>"
+    link+="<br><a href=/movie>爬電影</a><br><hr>"
     return link
 
 @app.route("/mis")
@@ -79,6 +83,67 @@ def read():
     for doc in docs:         
         Result += str(doc.to_dict()) + "<br>"    
     return Result
+
+@app.route("/search", methods=["GET", "POST"])
+def search():
+    results = []
+    keyword = ""
+    if request.method == "POST":
+        keyword = request.form.get("keyword", "").strip()
+        if keyword:
+            collection_ref = db.collection("靜宜資管")
+            docs = collection_ref.get()
+            for doc in docs:
+                teacher = doc.to_dict()
+                if keyword in teacher.get("name", ""):
+                    results.append(teacher)
+    return render_template("search.html", results=results, keyword=keyword)
+
+@app.route("/teacher")
+def teacher():
+    import requests
+    from bs4 import BeautifulSoup
+
+    url = "https://www1.pu.edu.tw/~tcyang/course.html"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+    }
+   
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.encoding = "utf-8"
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        result = ""
+        seen = set()
+        for a in soup.select("a"):
+            href = a.get("href", "")
+            name = a.get_text(strip=True)
+            if "drive.google.com" in href and href not in seen:
+                seen.add(href)
+                result += name + href + "<br>"
+
+        if result == "":
+            result = "抓不到課程資料"
+    except Exception as e:
+        result = "錯誤：" + str(e)
+
+    return result + "<br><a href=/>返回首頁</a>"
+
+@app.route("/movie")
+def movie():
+    url = "https://www.atmovies.com.tw/movie/next/"
+    Data = requests.get(url)
+    R = ""
+    sp = BeautifulSoup(Data.text, "html.parser")
+    result=sp.select(".filmListAllX li")
+    info = ""
+    for item in result:
+        R+=item.find("img").get("alt")+"<br>"
+        R+="https://www.atmovies.com.tw/movie/next/"+item.find("a").get("href")+"<br>"
+        R+="https://www.atmovies.com.tw/movie/next/"+item.find("img").get("src")+"<br><br>"
+    return R
+
 
 if __name__ == "__main__":
     app.run(debug=True)
