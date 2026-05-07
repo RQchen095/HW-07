@@ -38,6 +38,8 @@ def index():
     link += "<a href=/teacher>爬老師課程</a><br><hr>"
     link += "<a href=/spiderMovie>爬蟲存進資料庫</a><br><hr>"
     link += "<a href=/movie>查詢電影</a><br><hr>"
+    link += "<a href=/road>台中市被撞排行榜</a><br><hr>"
+    link += "<a href=/weather>隨機欺負沒帶雨傘的人</a><br><hr>"
     return link
 
 @app.route("/mis")
@@ -238,6 +240,100 @@ def movie():
         total=total
     )
 
+import urllib3
+import requests, json
+
+# 關閉 SSL 警告(因為政府網站憑證有問題)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+import urllib3
+import requests, json
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+@app.route("/road")
+def road():
+    R = "<h1>台中市被撞排行榜_by陳若綺</h1><br>"
+    url = "https://datacenter.taichung.gov.tw/swagger/OpenData/a1b899c0-511f-4e3d-b22b-814982a97e41"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
+    try:
+        Data = requests.get(url, headers=headers, timeout=10, verify=False)
+        JsonData = Data.json()
+    except Exception as e:
+        return f"<h1>抓取失敗</h1><p>{e}</p><pre>{Data.text[:500] if 'Data' in dir() else ''}</pre>"
+    
+    for item in JsonData:
+        R += f"{item['路口名稱']} 原因:{item['主要肇因']} 共 {item['總件數']} 件<br>"
+    
+    return R
+
+from flask import request
+
+@app.route("/weather", methods=["GET", "POST"])
+def weather():
+    # 表單頁面
+    form = """
+    <h1>縣市天氣查詢</h1>
+    <form method="POST">
+        <input type="text" name="city" placeholder="例如:臺中市" required>
+        <button type="submit">查詢</button>
+    </form>
+    <p>支援格式:臺北市、新北市、臺中市、臺南市、高雄市、桃園市、基隆市、新竹市、嘉義市、新竹縣、苗栗縣、彰化縣、南投縣、雲林縣、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣</p>
+    """
+    
+    if request.method == "GET":
+        return form
+    
+    # POST: 處理查詢
+    city = request.form.get("city", "").strip()
+    
+    # 自動把「台」轉成「臺」(API 用的是正體字)
+    city = city.replace("台", "臺")
+    
+    # 中央氣象署 API(這是公開的授權碼,建議自己申請)
+    auth = "CWA-A397F196-58FF-447A-AF7A-67A4290AFC35"  # 換成你自己的
+    url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
+    params = {
+        "Authorization": auth,
+        "locationName": city
+    }
+    
+    try:
+        resp = requests.get(url, params=params, timeout=10, verify=False)  # ← 加 verify=False
+        data = resp.json()
+    except Exception as e:
+        return form + f"<p style='color:red'>抓取失敗:{e}</p>"
+    
+    # 檢查有沒有資料
+    locations = data.get("records", {}).get("location", [])
+    if not locations:
+        return form + f"<p style='color:red'>找不到「{city}」的資料,請檢查縣市名稱</p>"
+    
+    loc = locations[0]
+    R = f"<h1>{loc['locationName']} 天氣預報</h1>"
+    
+    # 把資料整理成字典: {要素名稱: [時段資料]}
+    elements = {e["elementName"]: e["time"] for e in loc["weatherElement"]}
+    
+    # 三個時段(每段 12 小時)
+    R += "<table border='1' cellpadding='8' style='border-collapse:collapse'>"
+    R += "<tr><th>時段</th><th>天氣</th><th>溫度</th><th>降雨機率</th><th>舒適度</th></tr>"
+    
+    for i in range(len(elements["Wx"])):
+        start = elements["Wx"][i]["startTime"]
+        end = elements["Wx"][i]["endTime"]
+        wx = elements["Wx"][i]["parameter"]["parameterName"]
+        pop = elements["PoP"][i]["parameter"]["parameterName"]
+        min_t = elements["MinT"][i]["parameter"]["parameterName"]
+        max_t = elements["MaxT"][i]["parameter"]["parameterName"]
+        ci = elements["CI"][i]["parameter"]["parameterName"]
+        
+        R += f"<tr><td>{start}<br>~{end}</td><td>{wx}</td><td>{min_t}~{max_t}°C</td><td>{pop}%</td><td>{ci}</td></tr>"
+    
+    R += "</table>"
+    R += '<br><a href="/weather">重新查詢</a>'
+    return R
 
 if __name__ == "__main__":
     app.run(debug=True)
