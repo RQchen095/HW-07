@@ -396,7 +396,7 @@ def rate():
         }
 
         db = firestore.client()
-        collection_ref = db.collection("電影含分級")
+        collection_ref = db.collection("movies")
         docs = collection_ref.get()
         result = ""
         for doc in docs:
