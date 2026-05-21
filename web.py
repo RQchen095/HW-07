@@ -44,7 +44,8 @@ def index():
     link += "<a href=/road>台中市被撞排行榜</a><br><hr>"
     link += "<a href=/weather>隨機欺負沒帶雨傘的人</a><br><hr>"
     link += "<a href=/webhook>聊天機器人</a><br><hr>"
-    return link
+    link += "<a href=/rate>電影查詢</a><br><hr>"
+    return link 
 
 
 @app.route("/mis")
@@ -337,6 +338,74 @@ def webhook():
 
     return make_response(jsonify({"fulfillmentText": info}))
 
+@app.route("/rate")
+def rate():
+    #本週新片
+    url = "https://www.atmovies.com.tw/movie/new/"
+    Data = requests.get(url)
+    Data.encoding = "utf-8"
+    sp = BeautifulSoup(Data.text, "html.parser")
+    lastUpdate = sp.find(class_="smaller09").text[5:]
+    print(lastUpdate)
+    print()
+
+    result=sp.select(".filmList")
+
+    for x in result:
+        title = x.find("a").text
+        introduce = x.find("p").text
+
+        movie_id = x.find("a").get("href").replace("/", "").replace("movie", "")
+        hyperlink = "http://www.atmovies.com.tw/movie/" + movie_id
+        picture = "https://www.atmovies.com.tw/photo101/" + movie_id + "/pm_" + movie_id + ".jpg"
+
+        r = x.find(class_="runtime").find("img")
+        rate = ""
+        if r != None:
+            rr = r.get("src").replace("/images/cer_", "").replace(".gif", "")
+            if rr == "G":
+                rate = "普遍級"
+            elif rr == "P":
+                rate = "保護級"
+            elif rr == "F2":
+                rate = "輔12級"
+            elif rr == "F5":
+                rate = "輔15級"
+            else:
+                rate = "限制級"
+
+        t = x.find(class_="runtime").text
+
+        t1 = t.find("片長")
+        t2 = t.find("分")
+        showLength = t[t1+3:t2]
+
+        t1 = t.find("上映日期")
+        t2 = t.find("上映廳數")
+        showDate = t[t1+5:t2-8]
+
+        doc = {
+            "title": title,
+            "introduce": introduce,
+            "picture": picture,
+            "hyperlink": hyperlink,
+            "showDate": showDate,
+            "showLength": int(showLength),
+            "rate": rate,
+            "lastUpdate": lastUpdate
+        }
+
+        db = firestore.client()
+        collection_ref = db.collection("電影含分級")
+        docs = collection_ref.get()
+        result = ""
+        for doc in docs:
+            dict = doc.to_dict()
+            if rate in dict["rate"]:
+                result += "片名：" + dict["title"] + "\n"
+                result += "介紹：" + dict["hyperlink"] + "\n\n"
+        info += result
+    return make_response(jsonify({"fulfillmentText": info}))
 
 if __name__ == "__main__":
     app.run(debug=True)
