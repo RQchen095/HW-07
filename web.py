@@ -28,6 +28,7 @@ app = Flask(__name__)
 def index():
     link = "<h1>我的Python網頁</h1>"
     link += "<a href=/mis>課程</a><br><hr>"
+    link += "<a href=/take>聊天的東西</a><br><hr>"
     link += "<a href=/today>今天日期時間</a><br><hr>"
     link += "<a href=/me>我的網頁</a><br><hr>"
     link += "<a href=/welcome?u=ycc&d=靜宜資管&c=資訊管理導論>Get傳值</a><br><hr>"
@@ -40,9 +41,14 @@ def index():
     link += "<a href=/movie>查詢電影</a><br><hr>"
     link += "<a href=/road>台中市被撞排行榜</a><br><hr>"
     link += "<a href=/weather>隨機欺負沒帶雨傘的人</a><br><hr>"
-    return link
+    link += "<a href=/webhook>聊天機器人</a><br><hr>"
+    return link 
 
 @app.route("/mis")
+def course():
+    return "<h1>資訊管理導論</h1><a href=/>返回首頁</a>"
+
+@app.route("/take")
 def course():
     return "<h1>資訊管理導論</h1><a href=/>返回首頁</a>"
 
@@ -334,6 +340,29 @@ def weather():
     R += "</table>"
     R += '<br><a href="/weather">重新查詢</a>'
     return R
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    # build a request object
+    req = request.get_json(force=True)
+    # fetch queryResult from json
+    action =  req["queryResult"]["action"]
+    #msg =  req["queryResult"]["queryText"]
+    #info = "我是楊承智設計的機器人,動作：" + action + "； 查詢內容：" + msg
+
+    if (action == "rateChoice"):
+        rate = req["queryResult"]["parameters"]["rate"]
+        info = "我是陳若綺開發的電影聊天機器人,您選擇的電影分級是：" + rate
+        db = firestore.client()
+        collection_ref = db.collection("本週新片含分級")
+        docs = collection_ref.get()
+        result = ""
+        for doc in docs:
+            dict = doc.to_dict()
+            if rate in dict["rate"]:
+                result += "片名：" + dict["title"] + "\n"
+                result += "介紹：" + dict["hyperlink"] + "\n\n"
+        info += result
+    return make_response(jsonify({"fulfillmentText": info}))
 
 if __name__ == "__main__":
     app.run(debug=True)
