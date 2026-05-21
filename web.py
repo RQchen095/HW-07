@@ -319,24 +319,28 @@ def weather():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # build a request object
     req = request.get_json(force=True)
-    action = req["queryResult"]["action"]
-    info = ""
+    # fetch queryResult from json
+    action =  req["queryResult"]["action"]
+    #msg =  req["queryResult"]["queryText"]
+    #info = "我是楊承智設計的機器人,動作：" + action + "； 查詢內容：" + msg
 
-    if action == "rateChoice":
+    if (action == "rateChoice"):
         rate = req["queryResult"]["parameters"]["rate"]
-        info = "我是陳若綺開發的電影聊天機器人,您選擇的電影分級是:" + rate
+        info = "我是411316379開發的電影聊天機器人,您選擇的電影分級是：" + rate
+        db = firestore.client()
         collection_ref = db.collection("本週新片含分級")
         docs = collection_ref.get()
         result = ""
         for doc in docs:
-            d = doc.to_dict()
-            if rate in d.get("rate", ""):
-                result += "片名:" + d.get("title", "") + "\n"
-                result += "介紹:" + d.get("hyperlink", "") + "\n\n"
+            dict = doc.to_dict()
+            if rate in dict["rate"]:
+                result += "片名：" + dict["title"] + "\n"
+                result += "介紹：" + dict["hyperlink"] + "\n\n"
         info += result
-
     return make_response(jsonify({"fulfillmentText": info}))
+
 
 @app.route("/rate")
 def rate():
@@ -396,16 +400,10 @@ def rate():
         }
 
         db = firestore.client()
-        collection_ref = db.collection("movies")
-        docs = collection_ref.get()
-        result = ""
-        for doc in docs:
-            dict = doc.to_dict()
-            if rate in dict["rate"]:
-                result += "片名：" + dict["title"] + "\n"
-                result += "介紹：" + dict["hyperlink"] + "\n\n"
-        info += result
-    return make_response(jsonify({"fulfillmentText": info}))
+        doc_ref = db.collection("本週新片含分級").document(movie_id)
+        doc_ref.set(doc)
+    return "本週新片已爬蟲及存檔完畢，網站最近更新日期為：" + lastUpdate
+
 
 if __name__ == "__main__":
     app.run(debug=True)
