@@ -1,21 +1,22 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify, make_response
 from datetime import datetime
 import os
 import math
-
 import json
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 import requests
 from bs4 import BeautifulSoup
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # 判斷是在 Vercel 還是本地
 if os.path.exists('serviceAccountKey.json'):
-    # 本地環境:讀取檔案
     cred = credentials.Certificate('serviceAccountKey.json')
 else:
-    # 雲端環境:從環境變數讀取 JSON 字串
     firebase_config = os.getenv('FIREBASE_CONFIG')
     cred_dict = json.loads(firebase_config)
     cred = credentials.Certificate(cred_dict)
@@ -23,6 +24,7 @@ else:
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 app = Flask(__name__)
+
 
 @app.route("/")
 def index():
@@ -42,25 +44,30 @@ def index():
     link += "<a href=/road>台中市被撞排行榜</a><br><hr>"
     link += "<a href=/weather>隨機欺負沒帶雨傘的人</a><br><hr>"
     link += "<a href=/webhook>聊天機器人</a><br><hr>"
-    return link 
+    return link
+
 
 @app.route("/mis")
-def course():
+def mis():
     return "<h1>資訊管理導論</h1><a href=/>返回首頁</a>"
 
+
 @app.route("/take")
-def course():
-    return "<h1>資訊管理導論</h1><a href=/>返回首頁</a>"
+def take():
+    return "<h1>聊天的東西</h1><a href=/>返回首頁</a>"
+
 
 @app.route("/today")
 def today():
     now = datetime.now()
     return render_template("today.html", datetime=str(now))
 
+
 @app.route("/me")
 def me():
     now = datetime.now()
     return render_template("MIS2B411316337.html", datetime=str(now))
+
 
 @app.route("/welcome", methods=["GET"])
 def welcome():
@@ -69,19 +76,21 @@ def welcome():
     c = request.values.get("c")
     return render_template("welcome.html", name=user, dep=d, course=c)
 
+
 @app.route("/account", methods=["GET", "POST"])
 def account():
     if request.method == "POST":
         user = request.form["user"]
         pwd = request.form["pwd"]
-        result = "您輸入的帳號是:" + user + "; 密碼為:" + pwd
-        return result
+        return "您輸入的帳號是:" + user + "; 密碼為:" + pwd
     else:
         return render_template("account.html")
+
 
 @app.route("/count")
 def count():
     return render_template("count.html")
+
 
 @app.route("/read")
 def read():
@@ -91,6 +100,7 @@ def read():
     for doc in docs:
         Result += str(doc.to_dict()) + "<br>"
     return Result
+
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
@@ -107,18 +117,17 @@ def search():
                     results.append(teacher)
     return render_template("search.html", results=results, keyword=keyword)
 
+
 @app.route("/teacher")
 def teacher():
     url = "https://www1.pu.edu.tw/~tcyang/course.html"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
     }
-
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "html.parser")
-
         result = ""
         seen = set()
         for a in soup.select("a"):
@@ -127,12 +136,10 @@ def teacher():
             if "drive.google.com" in href and href not in seen:
                 seen.add(href)
                 result += name + href + "<br>"
-
         if result == "":
             result = "抓不到課程資料"
     except Exception as e:
         result = "錯誤:" + str(e)
-
     return result + "<br><a href=/>返回首頁</a>"
 
 
@@ -142,14 +149,12 @@ def spiderMovie():
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
     }
-
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         resp.encoding = "utf-8"
         sp = BeautifulSoup(resp.text, "html.parser")
         items = sp.select(".filmListAllX li")
 
-        # 先清掉舊資料
         movies_ref = db.collection("movies")
         for old in movies_ref.stream():
             old.reference.delete()
@@ -167,7 +172,6 @@ def spiderMovie():
             href = a_tag.get("href", "")
             src = img_tag.get("src", "")
 
-            # 抓上映日期
             date_text = ""
             date_tag = item.select_one(".runtime")
             if date_tag:
@@ -187,35 +191,30 @@ def spiderMovie():
                 "release_date": date_text,
                 "updated_at": now_str
             }
-
             movies_ref.document(str(idx)).set(movie_data)
             all_movies.append(movie_data)
 
-        count = len(all_movies)
-
-        # 存 meta 資訊
+        count_num = len(all_movies)
         db.collection("meta").document("spider_info").set({
             "last_updated": now_str,
-            "total": count
+            "total": count_num
         })
 
-        # 用 template 顯示結果(含全部電影列表)
         return render_template(
             "spider_result.html",
             last_updated=now_str,
-            total=count,
+            total=count_num,
             results=all_movies
         )
-
     except Exception as e:
         return f"錯誤:{str(e)}<br><a href=/>返回首頁</a>"
-    
+
+
 @app.route("/movie", methods=["GET", "POST"])
 def movie():
     keyword = ""
     results = []
 
-    # 讀取更新資訊
     meta_doc = db.collection("meta").document("spider_info").get()
     if meta_doc.exists:
         meta = meta_doc.to_dict()
@@ -225,7 +224,6 @@ def movie():
         last_updated = "尚未爬取"
         total = 0
 
-    # 從資料庫讀全部電影
     movies_ref = db.collection("movies")
     docs = movies_ref.stream()
     all_movies = [doc.to_dict() for doc in docs]
@@ -236,7 +234,7 @@ def movie():
         if keyword:
             results = [m for m in all_movies if keyword in m.get("name", "")]
         else:
-            results = all_movies   # POST 但留空 → 全部
+            results = all_movies
 
     return render_template(
         "movie.html",
@@ -246,39 +244,27 @@ def movie():
         total=total
     )
 
-import urllib3
-import requests, json
-
-# 關閉 SSL 警告(因為政府網站憑證有問題)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-import urllib3
-import requests, json
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 @app.route("/road")
 def road():
     R = "<h1>台中市被撞排行榜_by陳若綺</h1><br>"
     url = "https://datacenter.taichung.gov.tw/swagger/OpenData/a1b899c0-511f-4e3d-b22b-814982a97e41"
     headers = {'User-Agent': 'Mozilla/5.0'}
-    
+    Data = None
     try:
         Data = requests.get(url, headers=headers, timeout=10, verify=False)
         JsonData = Data.json()
     except Exception as e:
-        return f"<h1>抓取失敗</h1><p>{e}</p><pre>{Data.text[:500] if 'Data' in dir() else ''}</pre>"
-    
+        snippet = Data.text[:500] if Data is not None else ""
+        return f"<h1>抓取失敗</h1><p>{e}</p><pre>{snippet}</pre>"
+
     for item in JsonData:
         R += f"{item['路口名稱']} 原因:{item['主要肇因']} 共 {item['總件數']} 件<br>"
-    
     return R
 
-from flask import request
 
 @app.route("/weather", methods=["GET", "POST"])
 def weather():
-    # 表單頁面
     form = """
     <h1>縣市天氣查詢</h1>
     <form method="POST">
@@ -287,45 +273,34 @@ def weather():
     </form>
     <p>支援格式:臺北市、新北市、臺中市、臺南市、高雄市、桃園市、基隆市、新竹市、嘉義市、新竹縣、苗栗縣、彰化縣、南投縣、雲林縣、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣</p>
     """
-    
+
     if request.method == "GET":
         return form
-    
-    # POST: 處理查詢
+
     city = request.form.get("city", "").strip()
-    
-    # 自動把「台」轉成「臺」(API 用的是正體字)
     city = city.replace("台", "臺")
-    
-    # 中央氣象署 API(這是公開的授權碼,建議自己申請)
-    auth = "CWA-A397F196-58FF-447A-AF7A-67A4290AFC35"  # 換成你自己的
-    url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
-    params = {
-        "Authorization": auth,
-        "locationName": city
-    }
-    
+
+    auth = "CWA-A397F196-58FF-447A-AF7A-67A4290AFC35"
+    url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
+    params = {"Authorization": auth, "locationName": city}
+
     try:
-        resp = requests.get(url, params=params, timeout=10, verify=False)  # ← 加 verify=False
+        resp = requests.get(url, params=params, timeout=10, verify=False)
         data = resp.json()
     except Exception as e:
         return form + f"<p style='color:red'>抓取失敗:{e}</p>"
-    
-    # 檢查有沒有資料
+
     locations = data.get("records", {}).get("location", [])
     if not locations:
         return form + f"<p style='color:red'>找不到「{city}」的資料,請檢查縣市名稱</p>"
-    
+
     loc = locations[0]
     R = f"<h1>{loc['locationName']} 天氣預報</h1>"
-    
-    # 把資料整理成字典: {要素名稱: [時段資料]}
     elements = {e["elementName"]: e["time"] for e in loc["weatherElement"]}
-    
-    # 三個時段(每段 12 小時)
+
     R += "<table border='1' cellpadding='8' style='border-collapse:collapse'>"
     R += "<tr><th>時段</th><th>天氣</th><th>溫度</th><th>降雨機率</th><th>舒適度</th></tr>"
-    
+
     for i in range(len(elements["Wx"])):
         start = elements["Wx"][i]["startTime"]
         end = elements["Wx"][i]["endTime"]
@@ -334,35 +309,34 @@ def weather():
         min_t = elements["MinT"][i]["parameter"]["parameterName"]
         max_t = elements["MaxT"][i]["parameter"]["parameterName"]
         ci = elements["CI"][i]["parameter"]["parameterName"]
-        
         R += f"<tr><td>{start}<br>~{end}</td><td>{wx}</td><td>{min_t}~{max_t}°C</td><td>{pop}%</td><td>{ci}</td></tr>"
-    
+
     R += "</table>"
     R += '<br><a href="/weather">重新查詢</a>'
     return R
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    # build a request object
     req = request.get_json(force=True)
-    # fetch queryResult from json
-    action =  req["queryResult"]["action"]
-    #msg =  req["queryResult"]["queryText"]
-    #info = "我是楊承智設計的機器人,動作：" + action + "； 查詢內容：" + msg
+    action = req["queryResult"]["action"]
+    info = ""
 
-    if (action == "rateChoice"):
+    if action == "rateChoice":
         rate = req["queryResult"]["parameters"]["rate"]
-        info = "我是陳若綺開發的電影聊天機器人,您選擇的電影分級是：" + rate
-        db = firestore.client()
+        info = "我是陳若綺開發的電影聊天機器人,您選擇的電影分級是:" + rate
         collection_ref = db.collection("本週新片含分級")
         docs = collection_ref.get()
         result = ""
         for doc in docs:
-            dict = doc.to_dict()
-            if rate in dict["rate"]:
-                result += "片名：" + dict["title"] + "\n"
-                result += "介紹：" + dict["hyperlink"] + "\n\n"
+            d = doc.to_dict()
+            if rate in d.get("rate", ""):
+                result += "片名:" + d.get("title", "") + "\n"
+                result += "介紹:" + d.get("hyperlink", "") + "\n\n"
         info += result
+
     return make_response(jsonify({"fulfillmentText": info}))
+
 
 if __name__ == "__main__":
     app.run(debug=True)
