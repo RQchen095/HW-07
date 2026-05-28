@@ -28,6 +28,11 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 app = Flask(__name__)
 
+firebase_config = os.getenv('FIREBASE_CONFIG')
+if not firebase_config:
+    raise RuntimeError("FIREBASE_CONFIG 讀不到，請確認 Vercel 變數名稱與環境，並重新部署")
+cred_dict = json.loads(firebase_config)
+cred = credentials.Certificate(cred_dict)
 
 @app.route("/")
 def index():
