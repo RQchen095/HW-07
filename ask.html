@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>最簡 Gemini 測試</title>
+</head>
+<body style="max-width: 500px; margin: 50px auto; font-family: sans-serif;">
+    <h2>詢問 Gemini</h2>
+    <form id="aiForm">
+        <input type="text" id="promptInput" placeholder="輸入你想問的話..." style="width: 80%; padding: 8px;" required>
+        <button type="submit" style="padding: 8px;">送出</button>
+    </form>
+
+    <h3 style="margin-top: 30px;">AI 回應：</h3>
+    <div id="result" style="padding: 10px; background: #f0f0f0; min-height: 50px; white-space: pre-wrap;"></div>
+
+    <script>
+        document.getElementById('aiForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result');
+            const prompt = document.getElementById('promptInput').value;
+            
+            resultDiv.innerText = "思考中...";
+            
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'prompt=' + encodeURIComponent(prompt)
+                });
+                resultDiv.innerText = await response.text();
+            } catch (err) {
+                resultDiv.innerText = "發生錯誤: " + err;
+            }
+        };
+    </script>
+</body>
+</html>
