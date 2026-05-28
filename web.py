@@ -43,7 +43,14 @@ else:
 if not firebase_admin._apps:        # 避免 serverless 重複初始化報錯
     firebase_admin.initialize_app(cred)
 
-db = firestore.client()
+# Firestore client 延後初始化，避免 import 階段就 crash 整支 function
+_db = None
+def get_db():
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
+
 app = Flask(__name__)
 
 
@@ -118,6 +125,7 @@ def count():
 @app.route("/read")
 def read():
     Result = ""
+    db = get_db()
     collection_ref = db.collection("py")
     docs = collection_ref.get()
     for doc in docs:
@@ -132,6 +140,7 @@ def search():
     if request.method == "POST":
         keyword = request.form.get("keyword", "").strip()
         if keyword:
+            db = get_db()
             collection_ref = db.collection("靜宜資管")
             docs = collection_ref.get()
             for doc in docs:
@@ -178,6 +187,7 @@ def spiderMovie():
         sp = BeautifulSoup(resp.text, "html.parser")
         items = sp.select(".filmListAllX li")
 
+        db = get_db()
         movies_ref = db.collection("movies")
         for old in movies_ref.stream():
             old.reference.delete()
@@ -238,6 +248,7 @@ def movie():
     keyword = ""
     results = []
 
+    db = get_db()
     meta_doc = db.collection("meta").document("spider_info").get()
     if meta_doc.exists:
         meta = meta_doc.to_dict()
@@ -348,10 +359,11 @@ def webhook():
     #msg =  req["queryResult"]["queryText"]
     #info = "我是楊承智設計的機器人,動作：" + action + "； 查詢內容：" + msg
 
+    info = "未知的動作"   # 預設值，避免其他 action 進來時 info 未定義
     if (action == "rateChoice"):
         rate = req["queryResult"]["parameters"]["rate"]
         info = "我是411316379開發的電影聊天機器人,您選擇的電影分級是：" + rate
-        db = firestore.client()
+        db = get_db()
         collection_ref = db.collection("本週新片含分級")
         docs = collection_ref.get()
         result = ""
@@ -421,7 +433,7 @@ def rate():
             "lastUpdate": lastUpdate
         }
 
-        db = firestore.client()
+        db = get_db()
         doc_ref = db.collection("本週新片含分級").document(movie_id)
         doc_ref.set(doc)
     return "本週新片已爬蟲及存檔完畢，網站最近更新日期為：" + lastUpdate
@@ -433,6 +445,7 @@ def ask():
         if not user_prompt:
             return "請輸入內容", 400
         try:
+            client = get_genai_client()
             response = client.models.generate_content(
                 model='gemini-3.5-flash',
                 contents=user_prompt,
