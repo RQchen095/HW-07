@@ -4,6 +4,9 @@ import os
 import math
 import json
 
+from google import genai
+client = genai.Client()
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -45,6 +48,7 @@ def index():
     link += "<a href=/weather>隨機欺負沒帶雨傘的人</a><br><hr>"
     link += "<a href=/webhook>聊天機器人</a><br><hr>"
     link += "<a href=/rate>電影查詢</a><br><hr>"
+    link += "<a href=/ask>ㄟ哀</a><br><hr>"
     return link 
 
 
@@ -403,6 +407,25 @@ def rate():
         doc_ref = db.collection("本週新片含分級").document(movie_id)
         doc_ref.set(doc)
     return "本週新片已爬蟲及存檔完畢，網站最近更新日期為：" + lastUpdate
+
+@app.route('/ask', methods=['GET', 'POST']) 
+def ask():
+    if request.method == "POST":
+        user_prompt = request.form.get('prompt', '')
+        if not user_prompt:
+            return "請輸入內容", 400
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=user_prompt,
+            )
+            return response.text
+        except Exception as e:
+            return f"發生錯誤: {str(e)}", 500
+
+    else:    
+        # 當使用者直接打開網頁 (GET) 時，顯示輸入框畫面
+        return render_template("ask.html")
 
 
 if __name__ == "__main__":
