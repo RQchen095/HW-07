@@ -4,9 +4,6 @@ import os
 import math
 import json
 
-from google import genai
-client = genai.Client()
-
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -16,23 +13,39 @@ from bs4 import BeautifulSoup
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 判斷是在 Vercel 還是本地
-if os.path.exists('serviceAccountKey.json'):
-    cred = credentials.Certificate('serviceAccountKey.json')
+# Gemini client 延後初始化，避免 import 時就因缺 API key 而整支掛掉
+from google import genai
+_genai_client = None
+def get_genai_client():
+    global _genai_client
+    if _genai_client is None:
+        _genai_client = genai.Client()
+    return _genai_client
+
+# --- Firebase 初始化 ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+key_path = os.path.join(BASE_DIR, 'serviceAccountKey.json')
+
+if os.path.exists(key_path):
+    cred = credentials.Certificate(key_path)
 else:
     firebase_config = os.getenv('FIREBASE_CONFIG')
+    if not firebase_config:
+        # 印出實際抓到的環境變數，方便在 Vercel Runtime Logs 診斷
+        fire_keys = [k for k in os.environ.keys() if 'FIRE' in k.upper()]
+        raise RuntimeError(
+            f"FIREBASE_CONFIG 讀不到（值為 {firebase_config!r}）。"
+            f"目前環境中含 FIRE 的變數名稱有：{fire_keys}"
+        )
     cred_dict = json.loads(firebase_config)
     cred = credentials.Certificate(cred_dict)
 
-firebase_admin.initialize_app(cred)
+if not firebase_admin._apps:        # 避免 serverless 重複初始化報錯
+    firebase_admin.initialize_app(cred)
+
 db = firestore.client()
 app = Flask(__name__)
 
-firebase_config = os.getenv('FIREBASE_CONFIG')
-if not firebase_config:
-    raise RuntimeError("FIREBASE_CONFIG 讀不到，請確認 Vercel 變數名稱與環境，並重新部署")
-cred_dict = json.loads(firebase_config)
-cred = credentials.Certificate(cred_dict)
 
 @app.route("/")
 def index():
